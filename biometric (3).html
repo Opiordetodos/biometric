@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Biometric</title>
+<style>
+:root{--green:#123f32;--green2:#1d604b;--line:#d8e3dc;--ink:#1e2b25;--muted:#64736b}
+*{box-sizing:border-box}
+body{margin:0;background:#f5f8f6;color:var(--ink);font:15px/1.5 Arial,Helvetica,sans-serif}
+header{background:var(--green);color:#fff;padding:25px max(22px,calc((100% - 900px)/2))}
+header h1{margin:0;font-size:27px}
+header p{margin:3px 0 0;color:#d8e8df}
+main{max-width:900px;margin:28px auto;padding:0 18px 45px}
+.panel{background:#fff;border:1px solid var(--line);border-radius:12px;padding:23px;margin-bottom:18px}
+h2{font-size:17px;color:var(--green);margin:0 0 16px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.field{display:flex;flex-direction:column;gap:5px}
+label{font-weight:600;font-size:13px}
+input,select{width:100%;border:1px solid #bdcdc3;border-radius:7px;padding:11px 12px;font:inherit;font-size:16px;background:#fff;color:var(--ink)}
+input:focus,select:focus{outline:2px solid #a8cbb7;border-color:var(--green2)}
+small,.hint{color:var(--muted);font-size:12px}
+.actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:18px}
+button{border:0;border-radius:7px;padding:11px 18px;font:inherit;cursor:pointer;min-height:44px}
+.primary{background:var(--green);color:#fff}
+.primary:hover{background:var(--green2)}
+.subtle{background:transparent;color:#53645b;border:1px solid var(--line);padding:9px 14px;font-size:13px}
+.notice{background:var(--green);color:#fff;border-radius:10px;padding:16px 18px;margin-bottom:18px;font-size:15px;line-height:1.45}
+.notice strong{display:block;font-size:17px;letter-spacing:.3px;margin-bottom:4px}
+.error{color:#a32e2e;font-size:13px;margin-top:12px;white-space:pre-line}
+#report,#success{display:none}
+#success{color:#216544;font-size:13px}
+.report-head{display:flex;justify-content:space-between;gap:15px;border-bottom:1px solid var(--line);padding-bottom:13px;margin-bottom:14px}
+.report-head h2{margin:0}
+.result-row{display:flex;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid #edf1ee}
+.result-row:last-child{border:0}
+.result-name{font-weight:600}
+.result-name small{display:block;font-weight:400}
+.result-value{text-align:right}
+.status{display:block;font-size:12px;color:var(--muted)}
+.status.ok{color:#216544}
+.status.atencao{color:#8a6a0a}
+.status.alerta{color:#a32e2e;font-weight:600}
+.summary{margin:14px 0 0;font-weight:600}
+dialog{border:0;border-radius:12px;padding:0;width:min(900px,96vw);height:min(90vh,900px);max-width:none;color:var(--ink)}
+dialog[open]{display:flex;flex-direction:column}
+dialog::backdrop{background:rgba(0,0,0,.5)}
+.preview-bar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 16px}
+#previewFrame{flex:1;width:100%;border:0;background:#eef2ef}
+#previewLink{font-size:13px;color:var(--green2)}
+.warning{margin-top:18px;padding:14px;background:#fff8e9;border:1px solid #efdfb8;border-radius:7px;font-weight:600;font-size:13px}
+@media(max-width:600px){
+  .grid{grid-template-columns:1fr}
+  .grid.pair{grid-template-columns:1fr 1fr}
+  .panel{padding:18px}
+  header{padding:20px 18px}
+  main{margin:18px auto}
+  .report-head{display:block}
+  .actions button{flex:1 1 100%}
+  .result-row{flex-direction:column;gap:2px}
+  .result-value{text-align:left}
+}
+@media print{body{background:#fff}.no-print,header{display:none!important}main{margin:0;padding:0}.panel{border:0;padding:0}#report{display:block!important}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Biometric</h1>
+  <p>Registro e análise informativa de medições</p>
+</header>
+<main>
+  <form id="medicalForm" novalidate>
+    <div class="notice" role="note">
+      <strong>ATENÇÃO: ESTE TESTE NÃO SUBSTITUI UM MÉDICO.</strong>
+      Se algum resultado der alterado, procure um médico para ter um diagnóstico completo e mais preciso.
+    </div>
+    <section class="panel">
+      <h2>Identificação</h2>
+      <div class="grid">
+        <div class="field"><label for="name">Nome da pessoa</label><input id="name" type="text" maxlength="120" autocomplete="off"></div>
+        <div class="field"><label for="age">Idade (anos completos)</label><input id="age" type="text" inputmode="numeric" autocomplete="off"></div>
+        <div class="field"><label for="sex">Sexo</label>
+          <select id="sex"><option value="">Selecione</option><option>Feminino</option><option>Masculino</option></select></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Medições (preencha somente as disponíveis)</h2>
+      <div class="grid">
+        <div class="field"><label for="glucose">Glicose (mg/dL)</label>
+          <input id="glucose" type="text" inputmode="decimal" placeholder="Ex.: 95">
+          <small>A classificação usa a referência de jejum.</small></div>
+        <div class="field"><label>Pressão arterial (mmHg)</label>
+          <div class="grid pair">
+            <div class="field"><input id="systolic" type="text" inputmode="numeric" placeholder="Sistólica (120)" aria-label="Sistólica"></div>
+            <div class="field"><input id="diastolic" type="text" inputmode="numeric" placeholder="Diastólica (80)" aria-label="Diastólica"></div>
+          </div></div>
+        <div class="field"><label for="temperature">Temperatura corporal (°C)</label>
+          <input id="temperature" type="text" inputmode="decimal" placeholder="Ex.: 36,5"></div>
+        <div class="field"><label for="heartRate">Frequência cardíaca (bpm)</label>
+          <input id="heartRate" type="text" inputmode="numeric" placeholder="Ex.: 72"></div>
+        <div class="field"><label for="oxygen">Saturação de oxigênio (%)</label>
+          <input id="oxygen" type="text" inputmode="numeric" placeholder="Ex.: 98"></div>
+        <div class="field"><label for="height">Altura (m)</label>
+          <input id="height" type="text" inputmode="decimal" placeholder="Ex.: 1,72"></div>
+        <div class="field"><label for="weight">Peso (kg)</label>
+          <input id="weight" type="text" inputmode="decimal" placeholder="Ex.: 68,5"></div>
+      </div>
+      <p class="hint">O IMC é calculado automaticamente quando altura e peso são informados.</p>
+      <div class="actions">
+        <button class="primary" type="submit">Analisar medições</button>
+        <button class="subtle" type="reset">Limpar formulário</button>
+      </div>
+      <div id="error" class="error" role="alert"></div>
+    </section>
+  </form>
+
+  <section id="report" class="panel" aria-live="polite">
+    <div class="report-head">
+      <div><h2>Relatório de medições</h2><div class="hint">Biometric · Resultado informativo</div></div>
+      <div class="hint" id="reportDate"></div>
+    </div>
+    <div id="personData"></div>
+    <div id="measurements"></div>
+    <p class="summary" id="summary"></p>
+    <div class="warning" id="warningText"></div>
+    <div class="actions no-print">
+      <button class="subtle" id="previewButton" type="button">Visualizar PDF</button>
+      <span id="success">Processamento finalizado. Download preparado.</span>
+    </div>
+  </section>
+
+  <dialog id="previewDialog" aria-label="Pré-visualização do PDF">
+    <div class="preview-bar">
+      <strong>Pré-visualização do PDF</strong>
+      <button class="subtle" id="closePreview" type="button">Fechar</button>
+    </div>
+    <iframe id="previewFrame" title="Pré-visualização do PDF"></iframe>
+    <div class="preview-bar">
+      <a id="previewLink" target="_blank" rel="noopener">Abrir em nova aba</a>
+      <button class="primary" id="pdfButton" type="button">Baixar PDF</button>
+    </div>
+  </dialog>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+"use strict";
+
+/* ============ CONFIGURAÇÃO ============
+   Limites de plausibilidade + códigos LOINC (observações) e unidades UCUM. */
+const AVISO = "Este teste não substitui um médico. Se houver alteração, procure um médico para um diagnóstico completo e mais preciso.";
+const PARAM = {
+  glicose:     { nome: "Glicose",               unidade: "mg/dL", min: 20,  max: 1000, loinc: "2345-7" },
+  sistolica:   { nome: "Pressão sistólica",     unidade: "mmHg",  min: 50,  max: 300 },
+  diastolica:  { nome: "Pressão diastólica",    unidade: "mmHg",  min: 30,  max: 200 },
+  pressao:     { nome: "Pressão arterial",      loinc: "85354-9" },
+  temperatura: { nome: "Temperatura corporal",  unidade: "°C",    min: 30,  max: 43,   loinc: "8310-5" },
+  frequencia:  { nome: "Frequência cardíaca",   unidade: "bpm",   min: 20,  max: 300,  loinc: "8867-4" },
+  saturacao:   { nome: "Saturação de oxigênio", unidade: "%",     min: 50,  max: 100,  loinc: "59408-5" },
+  altura:      { nome: "Altura",                unidade: "m",     min: 0.3, max: 2.5,  loinc: "8302-2" },
+  peso:        { nome: "Peso",                  unidade: "kg",    min: 0.5, max: 400,  loinc: "29463-7" },
+  imc:         { nome: "IMC",                   unidade: "kg/m²", loinc: "39156-5" }
+};
+// Plausibilidade por idade: [idade <, altura mín, altura máx (m), peso mín, peso máx (kg)]. Limites largos, só barram o impossível.
+const FAIXA_IDADE = [
+  [1,        0.3, 0.85, 0.5, 15],
+  [3,        0.6, 1.1,  5,   25],
+  [6,        0.7, 1.3,  8,   40],
+  [12,       0.9, 1.8,  12,  150],
+  [18,       1.1, 2.3,  25,  250],
+  [Infinity, 0.55, 2.5, 20,  400]
+];
+const ROTULO = { ok: "Normal", atencao: "Atenção", alerta: "Alterado" };
+
+// Atalho para document.getElementById.
+const $ = (id) => document.getElementById(id);
+// Formata um número para exibição com vírgula decimal; "casas" fixa a quantidade de casas decimais.
+const fmt = (n, casas) => (casas === undefined ? String(n) : n.toFixed(casas)).replace(".", ",");
+// Cria o resultado de uma classificação: nível ("ok", "atencao", "alerta" ou "info") e texto explicativo.
+const N = (nivel, texto) => ({ nivel, texto });
+
+/* ============ LEITURA E VALIDAÇÃO ============ */
+
+// Lê um campo de texto e converte em número.
+// Aceita "1,84" ou "1.84". Rejeita negativos, letras, notação científica e vazio.
+// Retorna {vazio:true} se estiver em branco, {erro:true} se o formato for inválido ou {valor:n}.
+// Com inteiro=true, só aceita números inteiros.
+function lerNumero(id, inteiro = false) {
+  const txt = $(id).value.trim().replace(",", ".");
+  if (txt === "") return { vazio: true };
+  const ok = inteiro ? /^\d+$/.test(txt) : /^\d+(\.\d+)?$/.test(txt);
+  return ok ? { valor: Number(txt) } : { erro: true };
+}
+
+// Lê uma medição opcional e confere se está dentro dos limites da tabela PARAM.
+// Retorna o valor, ou null se o campo estiver vazio ou inválido (no caso inválido, acrescenta a mensagem em "erros").
+function lerMedicao(id, chave, erros, inteiro = false) {
+  const p = PARAM[chave], r = lerNumero(id, inteiro);
+  if (r.vazio) return null;
+  if (r.erro || r.valor < p.min || r.valor > p.max) {
+    erros.push(`${p.nome}: informe um número ${inteiro ? "inteiro " : ""}entre ${fmt(p.min)} e ${fmt(p.max)} ${p.unidade}.`);
+    return null;
+  }
+  return r.valor;
+}
+
+// Lê e valida nome, idade (inteiro de 0 a 120) e sexo. As mensagens de erro vão para o array "erros".
+function lerPessoa(erros) {
+  const nome = $("name").value.trim().replace(/\s+/g, " ");
+  const idade = lerNumero("age", true);
+  const sexo = $("sex").value;
+  if (!/^\p{L}[\p{L} .'-]+$/u.test(nome)) erros.push("Nome: informe o nome da pessoa (apenas letras).");
+  if (idade.vazio || idade.erro || idade.valor > 120) erros.push("Idade: informe um número inteiro entre 0 e 120.");
+  if (!sexo) erros.push("Sexo: selecione uma opção.");
+  return { nome, idade: idade.valor, sexo };
+}
+
+// Lê todas as medições do formulário. Campos em branco ficam como null, pois nem todo exame tem todos os parâmetros.
+function lerMedicoes(erros) {
+  return {
+    glicose:     lerMedicao("glucose", "glicose", erros),
+    sistolica:   lerMedicao("systolic", "sistolica", erros, true),
+    diastolica:  lerMedicao("diastolic", "diastolica", erros, true),
+    temperatura: lerMedicao("temperature", "temperatura", erros),
+    frequencia:  lerMedicao("heartRate", "frequencia", erros, true),
+    saturacao:   lerMedicao("oxygen", "saturacao", erros, true),
+    altura:      lerMedicao("height", "altura", erros),
+    peso:        lerMedicao("weight", "peso", erros)
+  };
+}
+
+// Calcula o IMC: peso (kg) dividido pela altura (m) ao quadrado.
+const calcularIMC = (peso, altura) => peso / (altura * altura);
+
+// Confere se os dados fazem sentido em conjunto (os limites individuais já foram checados):
+// pressão completa e com sistólica maior que a diastólica, altura e peso plausíveis para a idade,
+// IMC calculado entre 10 e 80 e pelo menos uma medição preenchida.
+function validarCoerencia(d, erros) {
+  if ((d.sistolica === null) !== (d.diastolica === null)) {
+    erros.push("Pressão arterial: informe sistólica e diastólica juntas.");
+  } else if (d.sistolica !== null && d.sistolica <= d.diastolica) {
+    erros.push("Pressão arterial: a sistólica deve ser maior que a diastólica.");
+  }
+  if (d.idade !== undefined) {
+    const [, hMin, hMax, pMin, pMax] = FAIXA_IDADE.find(([limite]) => d.idade < limite);
+    if (d.altura !== null && (d.altura < hMin || d.altura > hMax)) {
+      erros.push(`Altura: para ${d.idade} ano(s), o esperado é entre ${fmt(hMin)} e ${fmt(hMax)} m. Use metros (ex.: 1,72).`);
+    }
+    if (d.peso !== null && (d.peso < pMin || d.peso > pMax)) {
+      erros.push(`Peso: para ${d.idade} ano(s), o esperado é entre ${fmt(pMin)} e ${fmt(pMax)} kg.`);
+    }
+  }
+  if (d.altura !== null && d.peso !== null) {
+    const imc = calcularIMC(d.peso, d.altura);
+    if (imc < 10 || imc > 80) {
+      erros.push(`Peso e altura parecem incoerentes (IMC calculado: ${fmt(imc, 1)}). Confira: peso em kg e altura em metros.`);
+    }
+  }
+  const algum = Object.entries(d).some(([k, v]) => !["nome", "idade", "sexo"].includes(k) && v !== null);
+  if (!algum) erros.push("Informe pelo menos uma medição.");
+}
+
+// Junta leitura e validação. Se houver qualquer erro, lança uma exceção com todas as mensagens;
+// caso contrário, devolve os dados prontos para análise.
+function validarFormulario() {
+  const erros = [];
+  const dados = { ...lerPessoa(erros), ...lerMedicoes(erros) };
+  validarCoerencia(dados, erros);
+  if (erros.length) throw new Error(erros.join("\n"));
+  return dados;
+}
+
+/* ============ CLASSIFICAÇÃO (uma função por parâmetro) ============
+   Referências: ADA/OMS (glicose), ESC/ESH 2018 (pressão), OMS (IMC), PALS (FC por idade). */
+
+// Classifica a glicose (mg/dL) pela referência de jejum (ADA/OMS).
+function classificarGlicose(v) {
+  if (v < 54)  return N("alerta", "Hipoglicemia importante");
+  if (v < 70)  return N("atencao", "Abaixo da referência (hipoglicemia)");
+  if (v < 100) return N("ok", "Dentro da referência (jejum)");
+  if (v < 126) return N("atencao", "Acima da referência em jejum (faixa de pré-diabetes)");
+  return N("alerta", "Acima da referência (faixa de diabetes se em jejum)");
+}
+
+const FAIXAS_PA = [ // [sistólica ≥, diastólica ≥, nível, texto] — vale a categoria mais alta
+  [180, 110, "alerta",  "Hipertensão grau 3"],
+  [160, 100, "alerta",  "Hipertensão grau 2"],
+  [140, 90,  "alerta",  "Hipertensão grau 1"],
+  [130, 85,  "atencao", "Normal-alta"],
+  [120, 80,  "ok",      "Normal"]
+];
+// Classifica a pressão arterial (mmHg) pelas faixas ESC/ESH 2018, valendo a categoria mais alta entre sistólica e diastólica.
+// Para menores de 18 anos não classifica, pois depende de percentis por idade, sexo e altura.
+function classificarPressao(sis, dia, idade) {
+  if (idade < 18) return N("info", "Em menores de 18 anos a pressão depende de percentis por idade, sexo e altura; avalie com um profissional.");
+  if (sis < 90 || dia < 60) return N("atencao", "Pressão baixa");
+  const f = FAIXAS_PA.find(([s, d]) => sis >= s || dia >= d);
+  return f ? N(f[2], f[3]) : N("ok", "Ótima");
+}
+
+// Classifica a temperatura corporal (°C): hipotermia, dentro da referência, febrícula ou febre.
+function classificarTemperatura(v) {
+  if (v < 35)   return N("alerta", "Hipotermia");
+  if (v < 37.5) return N("ok", "Dentro da referência");
+  if (v < 37.8) return N("atencao", "Estado febril (febrícula)");
+  return N("alerta", "Febre");
+}
+
+const FC_REPOUSO = [[1, 100, 160], [3, 90, 150], [6, 80, 140], [12, 70, 120], [Infinity, 60, 100]]; // [idade <, mín, máx]
+// Classifica a frequência cardíaca em repouso (bpm) conforme a faixa da idade (tabela FC_REPOUSO).
+function classificarFrequencia(v, idade) {
+  const [, min, max] = FC_REPOUSO.find(([limite]) => idade < limite);
+  if (v < min) return N("atencao", `Abaixo da referência para a idade (${min}-${max} bpm)`);
+  if (v > max) return N("atencao", `Acima da referência para a idade (${min}-${max} bpm)`);
+  return N("ok", "Dentro da referência em repouso");
+}
+
+// Classifica a saturação de oxigênio (%): normal (95 ou mais), levemente baixa (90 a 94) ou baixa (abaixo de 90).
+function classificarSaturacao(v) {
+  if (v >= 95) return N("ok", "Dentro da referência");
+  if (v >= 90) return N("atencao", "Levemente abaixo da referência");
+  return N("alerta", "Baixa");
+}
+
+// Classifica o IMC pelas faixas da OMS para adultos.
+// Para menores de 18 anos não classifica, pois o correto são as curvas da OMS por idade e sexo.
+function classificarIMC(v, idade) {
+  if (idade < 18) return N("info", "Em menores de 18 anos o IMC deve ser avaliado nas curvas da OMS por idade e sexo.");
+  if (v < 18.5) return N("atencao", "Baixo peso");
+  if (v < 25)   return N("ok", "Peso normal");
+  if (v < 30)   return N("atencao", "Sobrepeso");
+  if (v < 35)   return N("alerta", "Obesidade grau I");
+  if (v < 40)   return N("alerta", "Obesidade grau II");
+  return N("alerta", "Obesidade grau III");
+}
+
+/* ============ MODELO DO RELATÓRIO (usado na tela e no PDF) ============ */
+
+// Transforma os dados em linhas do relatório (nome, valor formatado, código LOINC, nível e texto).
+// Só entram os parâmetros preenchidos; o IMC é calculado quando há altura e peso.
+function montarLinhas(d) {
+  const linhas = [];
+  const add = (chave, valor, c = N("info", "")) =>
+    linhas.push({ nome: PARAM[chave].nome, loinc: PARAM[chave].loinc, valor, ...c });
+
+  if (d.glicose !== null)     add("glicose", `${fmt(d.glicose)} mg/dL`, classificarGlicose(d.glicose));
+  if (d.sistolica !== null)   add("pressao", `${d.sistolica}/${d.diastolica} mmHg`, classificarPressao(d.sistolica, d.diastolica, d.idade));
+  if (d.temperatura !== null) add("temperatura", `${fmt(d.temperatura)} °C`, classificarTemperatura(d.temperatura));
+  if (d.frequencia !== null)  add("frequencia", `${d.frequencia} bpm`, classificarFrequencia(d.frequencia, d.idade));
+  if (d.saturacao !== null)   add("saturacao", `${d.saturacao}%`, classificarSaturacao(d.saturacao));
+  if (d.altura !== null)      add("altura", `${fmt(d.altura)} m`);
+  if (d.peso !== null)        add("peso", `${fmt(d.peso)} kg`);
+  if (d.altura !== null && d.peso !== null) {
+    const imc = calcularIMC(d.peso, d.altura);
+    add("imc", `${fmt(imc, 1)} kg/m²`, classificarIMC(imc, d.idade));
+  }
+  return linhas;
+}
+
+// Gera a frase-resumo: quantos dos valores classificados estão fora da referência.
+function montarResumo(linhas) {
+  const classificadas = linhas.filter(l => l.nivel !== "info");
+  if (!classificadas.length) return "Nenhum valor com classificação automática foi informado.";
+  const fora = classificadas.filter(l => l.nivel !== "ok").length;
+  return fora
+    ? `${fora} de ${classificadas.length} valor(es) fora da referência. Procure um médico para avaliação.`
+    : `${classificadas.length} valor(es) classificado(s), todos dentro da referência.`;
+}
+
+// Monta o modelo completo do relatório (data, dados da pessoa, linhas e resumo).
+// O mesmo modelo alimenta a tela e o PDF.
+function montarRelatorio(d) {
+  const linhas = montarLinhas(d);
+  return {
+    data: new Date().toLocaleString("pt-BR"),
+    pessoa: [["Nome", d.nome], ["Idade", `${d.idade} anos`], ["Sexo", d.sexo]],
+    linhas,
+    resumo: montarResumo(linhas)
+  };
+}
+
+/* ============ TELA ============ */
+
+// Cria um elemento HTML com classe e texto. Usa textContent, o que evita injeção de HTML.
+function el(tag, classe, texto) {
+  const e = document.createElement(tag);
+  if (classe) e.className = classe;
+  if (texto !== undefined) e.textContent = texto;
+  return e;
+}
+
+// Cria uma linha do relatório na tela: nome (com código LOINC), valor e status colorido.
+function renderLinha(nome, valor, extra = {}) {
+  const linha = el("div", "result-row");
+  const rotulo = el("div", "result-name", nome);
+  if (extra.loinc) rotulo.append(el("small", "", `LOINC ${extra.loinc}`));
+  const resultado = el("div", "result-value", valor);
+  if (extra.texto) {
+    const rot = extra.nivel === "info" ? "" : `${ROTULO[extra.nivel]}: `;
+    resultado.append(el("span", `status ${extra.nivel}`, rot + extra.texto));
+  } else if (extra.nivel && extra.nivel !== "info") {
+    resultado.append(el("span", `status ${extra.nivel}`, ROTULO[extra.nivel]));
+  }
+  linha.append(rotulo, resultado);
+  return linha;
+}
+
+// Desenha o relatório na tela e rola a página até ele.
+function exibirRelatorio(r) {
+  $("personData").replaceChildren(...r.pessoa.map(([n, v]) => renderLinha(n, v)));
+  $("measurements").replaceChildren(...r.linhas.map(l => renderLinha(l.nome, l.valor, l)));
+  $("summary").textContent = r.resumo;
+  $("warningText").textContent = AVISO;
+  $("reportDate").textContent = r.data;
+  $("report").style.display = "block";
+  $("report").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+/* ============ PDF ============ */
+
+// Monta o documento PDF a partir do modelo do relatório e o devolve, ainda sem salvar.
+function criarPDF(r) {
+  const pdf = new window.jspdf.jsPDF();
+  const margem = 18;
+  let y = 22;
+
+  // Escreve um título na posição atual da página e avança a posição vertical.
+  const titulo = (texto, tam, cor = [18, 63, 50]) => {
+    pdf.setFont("helvetica", "bold"); pdf.setFontSize(tam); pdf.setTextColor(...cor);
+    pdf.text(texto, margem, y); y += tam / 2 + 2;
+  };
+  // Escreve uma lista de textos com quebra automática de linha e abre nova página quando acaba o espaço.
+  const linhas = (lista) => {
+    pdf.setFont("helvetica", "normal"); pdf.setFontSize(10); pdf.setTextColor(35, 45, 39);
+    lista.forEach(txt => {
+      const partes = pdf.splitTextToSize(txt, 174);
+      if (y + partes.length * 5 > 275) { pdf.addPage(); y = 20; }
+      pdf.text(partes, margem, y); y += partes.length * 5 + 2;
+    });
+    y += 4;
+  };
+
+  titulo("Biometric", 18);
+  titulo("Relatório de medições", 14, [35, 45, 39]);
+  linhas([`Gerado em: ${r.data}`]);
+  titulo("Identificação", 11);
+  linhas(r.pessoa.map(([n, v]) => `${n}: ${v}`));
+  titulo("Medições", 11);
+  linhas(r.linhas.map(l => {
+    const cod = l.loinc ? ` (LOINC ${l.loinc})` : "";
+    const rot = l.nivel === "info" ? "" : `${ROTULO[l.nivel]}`;
+    const det = [rot, l.texto].filter(Boolean).join(": ");
+    return `${l.nome}${cod}: ${l.valor}${det ? " - " + det : ""}`;
+  }));
+  titulo("Resumo", 11);
+  linhas([r.resumo]);
+  titulo("Aviso importante", 11);
+  linhas([AVISO]);
+  return pdf;
+}
+
+let pdfAtual = null, urlPreview = null;
+
+// Gera o PDF, cria um endereço temporário para ele e o mostra na janela de pré-visualização.
+// Sem a biblioteca jsPDF (sem internet), usa a impressão do navegador.
+function abrirPreview(r) {
+  if (!window.jspdf) { window.print(); return; }   // sem internet: imprime/salva como PDF pelo navegador
+  pdfAtual = criarPDF(r);
+  if (urlPreview) URL.revokeObjectURL(urlPreview);
+  urlPreview = URL.createObjectURL(pdfAtual.output("blob"));
+  $("previewFrame").src = urlPreview;
+  $("previewLink").href = urlPreview;
+  $("previewDialog").showModal();
+}
+
+// Fecha a janela de pré-visualização.
+const fecharPreview = () => $("previewDialog").close();
+
+/* ============ EVENTOS ============ */
+
+let ultimoRelatorio = null;
+
+// Ao enviar o formulário: valida, monta e exibe o relatório. Se houver erro, mostra as mensagens.
+$("medicalForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  $("error").textContent = "";
+  $("success").style.display = "none";
+  $("report").style.display = "none";
+  try {
+    ultimoRelatorio = montarRelatorio(validarFormulario());
+    exibirRelatorio(ultimoRelatorio);
+  } catch (erro) {
+    $("error").textContent = erro.message;
+  }
+});
+
+// Ao limpar o formulário: esconde o relatório, as mensagens e o aviso de download.
+$("medicalForm").addEventListener("reset", () => {
+  ultimoRelatorio = null;
+  $("error").textContent = "";
+  $("report").style.display = "none";
+  $("success").style.display = "none";
+});
+
+// Botão "Visualizar PDF": abre a pré-visualização do relatório atual.
+$("previewButton").addEventListener("click", () => {
+  if (ultimoRelatorio) abrirPreview(ultimoRelatorio);
+});
+
+// Botão "Fechar" da pré-visualização.
+$("closePreview").addEventListener("click", fecharPreview);
+
+// Também dispara ao fechar com a tecla Esc.
+$("previewDialog").addEventListener("close", () => $("previewFrame").removeAttribute("src"));
+
+// Botão "Baixar PDF": salva o PDF mostrado na pré-visualização e exibe o aviso de download preparado.
+$("pdfButton").addEventListener("click", () => {
+  if (!pdfAtual) return;
+  pdfAtual.save("Biometric-relatorio.pdf");
+  fecharPreview();
+  $("success").style.display = "inline";
+});
+</script>
+</body>
+</html>
